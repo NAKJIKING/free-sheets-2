@@ -154,6 +154,9 @@ def walk_category(cat):
         time.sleep(1.0)
 
 
+_debug_dumps = [3]  # 디버그 때 처음 몇 페이지의 구조를 로그로 남긴다
+
+
 def pick_pdf(work_title):
     """작품 페이지에서 Public Domain 표기가 있는 첫 PDF 파일명을 고른다."""
     url = ('https://imslp.org/index.php?title='
@@ -163,11 +166,22 @@ def pick_pdf(work_title):
     if raw is None:
         return None
     text = raw.decode('utf-8', 'replace')
-    for block in text.split('#fte:imslpfile')[1:]:
-        cp = re.search(r'\|\s*Copyright\s*=\s*([^\n|}]+)', block)
+    if os.environ.get('IMSLP_DEBUG') and _debug_dumps[0] > 0:
+        _debug_dumps[0] -= 1
+        blocks = text.lower().count('#fte:imslpfile')
+        cps = re.findall(r'\|\s*Copyright[^=\n]*=\s*([^\n|}]+)', text)[:5]
+        fns = re.findall(r'\|\s*File\s*Name[^=\n]*=\s*([^\n|}]+)', text)[:5]
+        print(f'  [덤프] {work_title!r} 길이 {len(text)} '
+              f'imslpfile블록 {blocks} Copyright {cps} File {fns}',
+              flush=True)
+        if blocks == 0:
+            print('  [덤프 원문 앞부분] ' + text[:700].replace('\n', ' ⏎ '),
+                  flush=True)
+    for block in re.split(r'#fte:\s*imslpfile', text, flags=re.I)[1:]:
+        cp = re.search(r'\|\s*Copyright[^=\n]*=\s*([^\n|}]+)', block)
         if not cp or 'public domain' not in cp.group(1).strip().lower():
             continue
-        for m in re.finditer(r'\|\s*File Name \d+\s*=\s*([^\n|}]+)', block):
+        for m in re.finditer(r'\|\s*File\s*Name[^=\n]*=\s*([^\n|}]+)', block):
             name = m.group(1).strip()
             if name.lower().endswith('.pdf'):
                 return name
@@ -219,9 +233,10 @@ def main():
     print(f'기존 곡 키 {len(seen)}개 (중복 제외 기준)', flush=True)
 
     debug = bool(os.environ.get('IMSLP_DEBUG'))
+    cats = CATEGORIES[:2] if debug else CATEGORIES  # 디버그는 2개만
     added = 0
     per_composer = {}
-    for cat, inst, cap in CATEGORIES:
+    for cat, inst, cap in cats:
         got = 0
         stats = {'seen': 0, 'paren': 0, 'wl': 0, 'fresh': 0, 'pdf': 0}
         samples = []
