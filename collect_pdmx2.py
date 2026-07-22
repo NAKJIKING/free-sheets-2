@@ -33,16 +33,17 @@ VOL1_CATALOG = ('https://raw.githubusercontent.com/NAKJIKING/'
                 'free-sheets/main/catalog.json')
 UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector)'}
 
-# 악기별 상한 — 총 ~2,850 목표 (실수확은 화이트리스트 통과분만큼)
+# 악기별 상한 — 2차 확대(IMSLP가 봇 차단으로 무산되어 PDMX로 보충).
+# 재실행하면 기존 곡은 건너뛰고 상한까지 이어서 채운다.
 CAPS = {
-    'Piano': 450,
-    'Guitar': 300,
-    'Flute': 350,
-    'Violin': 350,
-    'Cello': 350,
-    'Clarinet': 350,
-    'Trumpet': 350,
-    'Saxophone': 350,
+    'Piano': 1200,
+    'Guitar': 800,
+    'Flute': 500,
+    'Violin': 500,
+    'Cello': 500,
+    'Clarinet': 500,
+    'Trumpet': 500,
+    'Saxophone': 500,
 }
 
 # 1권 전수조사에서 차단된 MuseScore ID — 그대로 승계.
