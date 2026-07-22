@@ -164,15 +164,28 @@ def walk_category(cat):
 _debug_dumps = [3]  # 디버그 때 처음 몇 페이지의 구조를 로그로 남긴다
 
 
+def page_wikitext(title):
+    """작품 페이지 위키텍스트 — index.php는 봇 차단(캡차)이 걸리므로
+    api.php(prop=revisions)로 받는다 (api.php는 차단되지 않음)."""
+    data = api_get({
+        'action': 'query', 'prop': 'revisions', 'rvprop': 'content',
+        'rvslots': 'main', 'titles': title,
+    })
+    if not data:
+        return ''
+    for p in (data.get('query', {}).get('pages', {}) or {}).values():
+        revs = p.get('revisions') or []
+        if revs:
+            slot = (revs[0].get('slots') or {}).get('main') or {}
+            return slot.get('*') or revs[0].get('*') or ''
+    return ''
+
+
 def pick_pdf(work_title):
     """작품 페이지에서 Public Domain 표기가 있는 첫 PDF 파일명을 고른다."""
-    url = ('https://imslp.org/index.php?title='
-           + urllib.parse.quote(work_title.replace(' ', '_'))
-           + '&action=raw')
-    raw = fetch_bytes(url)
-    if raw is None:
+    text = page_wikitext(work_title)
+    if not text:
         return None
-    text = raw.decode('utf-8', 'replace')
     if os.environ.get('IMSLP_DEBUG') and _debug_dumps[0] > 0:
         _debug_dumps[0] -= 1
         blocks = text.lower().count('#fte:imslpfile')
@@ -289,6 +302,11 @@ def main():
                 continue
             time.sleep(2.0)  # 다운로드 예절
             data = fetch_bytes(url)
+            if debug:
+                head = (data[:16] if data else b'(None)')
+                print(f'  [파일 덤프] {name!r} url={url[:80]} '
+                      f'크기 {len(data) if data else 0} 머리 {head!r}',
+                      flush=True)
             if not data or not data.startswith(b'%PDF'):
                 continue
             asset = re.sub(r'[^A-Za-z0-9._-]', '_', name)[:100]
