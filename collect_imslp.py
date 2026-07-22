@@ -15,6 +15,7 @@
 
 전제: poppler-utils(pdftoppm), webp(cwebp) 설치.
 """
+import gzip
 import json
 import os
 import re
@@ -98,11 +99,17 @@ def api_get(params, retries=3):
 
 
 def fetch_bytes(url, retries=2):
-    req = urllib.request.Request(url, headers=UA)
+    # IMSLP는 Accept-Encoding 없이도 gzip으로 응답한다 — 평문을 요청하되
+    # 그래도 gzip 매직이 오면 직접 푼다 (action=raw가 이 경우였다).
+    req = urllib.request.Request(
+        url, headers={**UA, 'Accept-Encoding': 'identity'})
     for i in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=180) as r:
-                return r.read()
+                data = r.read()
+            if data[:2] == b'\x1f\x8b':
+                data = gzip.decompress(data)
+            return data
         except Exception as e:
             print(f'  ! 받기 재시도({i+1}): {e}', flush=True)
             time.sleep(3)
