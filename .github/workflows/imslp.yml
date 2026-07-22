@@ -1,0 +1,63 @@
+name: IMSLP 선별 수확
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: imslp
+  cancel-in-progress: false
+
+jobs:
+  imslp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      IMSLP_TAG: imslp-1
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 도구 설치 (poppler·webp)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils webp
+
+      - name: 수집 실행
+        run: python3 collect_imslp.py
+
+      - name: 릴리스 자산 업로드
+        run: |
+          if [ ! -d _imslp_out ] || [ -z "$(ls -A _imslp_out)" ]; then
+            echo '업로드할 자산 없음'
+            exit 0
+          fi
+          gh release view "$IMSLP_TAG" >/dev/null 2>&1 || \
+            gh release create "$IMSLP_TAG" -t "IMSLP scores ($IMSLP_TAG)" \
+              -n "Public domain scanned scores mirrored from IMSLP."
+          # 수백 개 자산 — 50개씩 나눠 업로드 (인자 길이·재시도 관리)
+          ls _imslp_out | sort > _assets.txt
+          split -l 50 _assets.txt _chunk_
+          for c in _chunk_*; do
+            files=$(sed 's|^|_imslp_out/|' "$c" | tr '\n' ' ')
+            for i in 1 2 3; do
+              gh release upload "$IMSLP_TAG" $files --clobber && break
+              sleep $((i * 5))
+            done
+          done
+          rm -f _assets.txt _chunk_*
+
+      - name: 카탈로그 커밋
+        run: |
+          git config user.name sheet-collector-bot
+          git config user.email actions@github.com
+          git add catalog2.json
+          if git diff --cached --quiet; then
+            echo '변경 없음'
+            exit 0
+          fi
+          git commit -m 'IMSLP 자동 수집 결과 [skip ci]'
+          for i in 1 2 3 4; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep $((i * 2))
+          done
