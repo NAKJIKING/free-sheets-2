@@ -36,7 +36,7 @@ UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector)'}
 # 악기별 상한 — 2차 확대(IMSLP가 봇 차단으로 무산되어 PDMX로 보충).
 # 재실행하면 기존 곡은 건너뛰고 상한까지 이어서 채운다.
 CAPS = {
-    'Piano': 1200,
+    'Piano': 2200,
     'Guitar': 800,
     'Flute': 500,
     'Violin': 500,
