@@ -218,12 +218,20 @@ def main():
     seen = existing_keys()
     print(f'기존 곡 키 {len(seen)}개 (중복 제외 기준)', flush=True)
 
+    debug = bool(os.environ.get('IMSLP_DEBUG'))
     added = 0
     per_composer = {}
     for cat, inst, cap in CATEGORIES:
         got = 0
+        stats = {'seen': 0, 'paren': 0, 'wl': 0, 'fresh': 0, 'pdf': 0}
+        samples = []
         print(f'== {cat} (상한 {cap})', flush=True)
         for title in walk_category(cat):
+            stats['seen'] += 1
+            if len(samples) < 5:
+                samples.append(title)
+            if debug and stats['seen'] >= 1200:
+                break
             if added >= TOTAL_LIMIT:
                 break
             if got >= cap:
@@ -231,9 +239,11 @@ def main():
             m = re.search(r'\(([^()]+)\)\s*$', title)
             if not m:
                 continue
+            stats['paren'] += 1
             composer = m.group(1).strip()  # 'Chopin, Frédéric'
             if not _PD_RE.search(composer):
                 continue
+            stats['wl'] += 1
             surname = composer.split(',')[0].strip()
             if per_composer.get(surname, 0) >= PER_COMPOSER:
                 continue
@@ -245,10 +255,12 @@ def main():
                 title.replace(' ', '_'))
             if src in done_urls:
                 continue
+            stats['fresh'] += 1
             time.sleep(1.0)
             name = pick_pdf(title)
             if not name:
                 continue
+            stats['pdf'] += 1
             time.sleep(1.0)
             url, size = file_url(name)
             if not url or size <= 0 or size > MAX_FILE:
@@ -285,6 +297,7 @@ def main():
                 print(f'  … 총 {added}곡', flush=True)
                 json.dump(catalog, open(CATALOG, 'w', encoding='utf-8'),
                           ensure_ascii=False, indent=1)
+        print(f'  {cat} 통계 {stats} / 예시 {samples[:3]}', flush=True)
         if added >= TOTAL_LIMIT:
             break
 

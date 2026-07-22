@@ -1,0 +1,21 @@
+name: IMSLP 디버그 (통계만)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMSLP_DEBUG: '1'
+      IMSLP_LIMIT: '3'
+    steps:
+      - uses: actions/checkout@v4
+      - name: 도구 설치
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils webp
+      - name: 통계 실행
+        run: python3 collect_imslp.py
