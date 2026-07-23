@@ -135,6 +135,34 @@ PD_COMPOSERS = [
     'Barnby', 'Dykes', 'Bradbury', 'Sankey', 'Sherwin', 'Doane',
     'Converse', 'Kirkpatrick', 'Hastings', 'Bourgeois', 'Croft',
     'Wesley',
+    # ── 교육 정전 보강 (초·중급 교재 저자 — 전원 사후 70년+ 확인) ──
+    # 피아노 초급 표준 교재
+    'Beyer',       # 페르디난트 바이어 Op.101 — 초급 피아노 표준(한국 필수)
+    'Reinagle',    # Alexander Reinagle — 초급 소품
+    'Reinecke',    # Carl Reinecke — 피아노·플루트
+    'Türk', 'Turk',  # Daniel Gottlob Türk — 초급 소품
+    'Oesten',      # Theodor Oesten — 소나티네·소품
+    'Lichner',     # Heinrich Lichner — 소나티네
+    'Spindler',    # Fritz Spindler — 교습용 소품
+    'Rebikov',     # Vladimir Rebikov — 어린이 소품
+    # 바이올린 에튀드·학생 협주곡
+    'Wohlfahrt',   # Franz Wohlfahrt Op.45 — 초급 바이올린 에튀드 표준
+    'Dont',        # Jakob Dont — 바이올린 에튀드
+    'Küchler', 'Kuchler',  # Ferdinand Küchler — 학생 협주곡
+    # 첼로 교재·소품
+    'Bréval', 'Breval',    # Jean-Baptiste Bréval — 첼로 소나타(스즈키)
+    'Fiocco',      # Joseph-Hector Fiocco — Allegro(학생 표준)
+    'Eccles',      # Henry Eccles — 첼로 소나타
+    'Goens',       # Daniel van Goens — 첼로 소품
+    # 플루트 교재
+    'Berbiguier',  # Tranquille Berbiguier — 플루트 에튀드
+    'Altès', 'Altes',      # Henry Altès — 플루트 교본
+    # 클라리넷·목관 교재
+    'Lefèvre', 'Lefevre',  # Xavier Lefèvre — 클라리넷 교본
+    'Ferling',     # Franz Wilhelm Ferling — 색소폰·오보에 에튀드
+    'Concone',     # Giuseppe Concone — 성악·악기 연습곡
+    # 관현악 소품
+    'Gossec',      # François-Joseph Gossec — Gavotte(학생 표준)
 ]
 _PD_RE = re.compile(
     r'\b(' + '|'.join(re.escape(n) for n in PD_COMPOSERS) + r')\b', re.I)
