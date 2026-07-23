@@ -33,18 +33,22 @@ VOL1_CATALOG = ('https://raw.githubusercontent.com/NAKJIKING/'
                 'free-sheets/main/catalog.json')
 UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector)'}
 
-# 악기별 상한 — 2차 확대(IMSLP가 봇 차단으로 무산되어 PDMX로 보충).
+# 악기별 상한 — 기존 분류만 유지(신규 악기 없음). 여유 상한을 주고
+# 이번 실행 신규 총량은 NEW_ADD로 ~3,000곡에서 끊는다.
 # 재실행하면 기존 곡은 건너뛰고 상한까지 이어서 채운다.
 CAPS = {
-    'Piano': 2200,
-    'Guitar': 800,
-    'Flute': 500,
-    'Violin': 500,
-    'Cello': 500,
-    'Clarinet': 500,
-    'Trumpet': 500,
-    'Saxophone': 500,
+    'Piano': 6000,
+    'Guitar': 1200,
+    'Flute': 1000,
+    'Violin': 900,
+    'Cello': 800,
+    'Clarinet': 700,
+    'Trumpet': 700,
+    'Saxophone': 700,
 }
+
+# 이번 실행에서 추가할 신규 곡 상한 (기존 분류 안에서 ~3,000곡).
+NEW_ADD = int(os.environ.get('NEW_ADD', '3000'))
 
 # 1권 전수조사에서 차단된 MuseScore ID — 그대로 승계.
 BLOCKED_IDS = {
@@ -301,7 +305,7 @@ def main():
         with tarfile.open(fileobj=r, mode='r|gz') as tf:
             remaining = len(wanted)
             for m in tf:
-                if remaining <= 0:
+                if remaining <= 0 or added >= NEW_ADD:
                     break
                 if not m.isfile():
                     continue
