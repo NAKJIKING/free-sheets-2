@@ -37,7 +37,7 @@ UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector)'}
 # 이번 실행 신규 총량은 NEW_ADD로 ~3,000곡에서 끊는다.
 # 재실행하면 기존 곡은 건너뛰고 상한까지 이어서 채운다.
 CAPS = {
-    'Piano': 6000,
+    'Piano': 8200,
     'Guitar': 1200,
     'Flute': 1000,
     'Violin': 900,
