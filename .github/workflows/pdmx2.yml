@@ -2,6 +2,10 @@ name: PDMX 확장 수집 (2권)
 
 on:
   workflow_dispatch:
+    inputs:
+      new_add:
+        description: '이번 런 신규 추가 상한(목표 곡수 미세조정)'
+        default: '3000'
 
 permissions:
   contents: write
@@ -21,6 +25,8 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils webp
 
       - name: 수집 실행
+        env:
+          NEW_ADD: ${{ inputs.new_add }}
         run: python3 collect_pdmx2.py
 
       - name: 결과 커밋
