@@ -1,3 +1,4 @@
 _imslp_out/
 _assets.txt
 _chunk_*
+__pycache__/
