@@ -163,16 +163,76 @@ PD_COMPOSERS = [
     'Concone',     # Giuseppe Concone — 성악·악기 연습곡
     # 관현악 소품
     'Gossec',      # François-Joseph Gossec — Gavotte(학생 표준)
+    # ── 2026-07 점검에서 표기 변형 탓에 놓쳤던 이름 보강 ──
+    'Goudimel',    # Claude Goudimel †1572 — 시편가 화성
+    'Petzold',     # Christian Petzold †1733 — 안나 막달레나 미뉴에트
+    'Liapounow',   # Lyapunov 독일식 표기 †1924
+    'Drouët',      # Louis Drouet — 악센트 표기
+    'Neander',     # Joachim Neander †1680 — 찬송가
 ]
+# 다른 뜻으로도 쓰이는 성 — 흔한 영어 낱말이거나(Field, Dont, Rose)
+# 현대 음악가의 '이름' 자리에 오는 것들(Lalo Schifrin, Ernst Toch).
+# 이 이름들은 문자열 아무 데나 나왔다고 통과시키면 안 되고, 반드시
+# 성 자리(마지막 토큰)에 있어야만 인정한다.
+AMBIGUOUS = {
+    'alford', 'andersen', 'auer', 'barnby', 'beyer', 'bourgeois', 'bridge',
+    'butterworth', 'clarke', 'converse', 'cramer', 'croft', 'doane', 'dont',
+    'dykes', 'eccles', 'ernst', 'field', 'gade', 'genin', 'gibbons', 'hanon',
+    'hastings', 'heller', 'hymn', 'klengel', 'kummer', 'lalo', 'marcello',
+    'milan', 'monti', 'parry', 'ponce', 'rode', 'rose', 'ries', 'seitz',
+    'sitt', 'stainer', 'turk', 'victoria', 'vincent', 'wesley',
+}
 _PD_RE = re.compile(
-    r'\b(' + '|'.join(re.escape(n) for n in PD_COMPOSERS) + r')\b', re.I)
+    '|'.join(re.escape(n) for n in PD_COMPOSERS), re.I)
+# 성 자리 밖(문자열 어디든)에서도 인정하는 이름 — 위 모호 목록 제외.
+_PD_LOOSE_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(n) for n in PD_COMPOSERS
+                      if n.lower() not in AMBIGUOUS) + r')\b', re.I)
+# 민요·작자 미상 표기 — 소스가 다국어라 영어 말고도 받아 준다.
 _TRAD_RE = re.compile(
-    r'\b(traditional|trad\.|folk|anonymous|anon\.?)\b', re.I)
+    r'\b(traditio\w*|trad\.?|tradicional|traddodiadol|folk\w*|folke\w*|'
+    r'anonym\w*|anon\.?|unattributed|unknown|ukjent|okänd|hymn|spiritual|'
+    r'gregorian|volkslied|chanson populaire)\b', re.I)
+
+# 이름 꼬리에 붙는 이니셜·서수·귀족 전치사 — 성을 찾을 때 떼어낸다.
+_TAIL = re.compile(
+    r"^(?:[a-z]\.?|jr\.?|sr\.?|i{1,3}|iv|von|van|de[nrl]?|d[aiu]|le|la)$",
+    re.I)
+
+
+def surname_of(field):
+    """이름 문자열들에서 '성'으로 볼 토큰만 뽑아 낸다.
+
+    작곡가 이름을 문자열 어디서나 찾으면(단순 부분일치) 엉뚱한 곡이
+    퍼블릭 도메인으로 통과한다 — 실제로 'dont know'가 Jakob **Dont**로,
+    'Lalo Schifrin'(1932~)이 Édouard **Lalo**로 잡혀 저작권 있는 곡이
+    섞여 들어왔다. 성은 이름의 마지막 토큰(또는 'Bach, J.S.'처럼 쉼표
+    앞)이므로 모호한 이름은 그 자리에서만 인정한다.
+    """
+    for part in re.split(r'[;/&]|\barr\.|\b(?:and|feat\.?|with)\b',
+                         re.sub(r'\(.*?\)', ' ', field or ''), flags=re.I):
+        part = part.strip()
+        if not part:
+            continue
+        if ',' in part:                       # "Bach, Johann Sebastian"
+            yield part.split(',', 1)[0].strip()
+            continue
+        toks = [t for t in part.split() if t]
+        while len(toks) > 1 and _TAIL.match(toks[-1]):
+            toks.pop()                        # "Strauss Jr." → Strauss
+        if toks:
+            yield toks[-1]
 
 
 def is_pd_safe(composer, artist):
     for field in (composer, artist):
-        if field and _PD_RE.search(field):
+        # ① 성 자리에 정확히 오면 인정 (모호한 이름도 여기선 통과)
+        for sur in surname_of(field):
+            if _PD_RE.fullmatch(sur.strip(" .,'\"-")):
+                return True
+        # ② 모호하지 않은 이름은 표기가 지저분해도('S.Rachmaninoff',
+        #    'Franz SchubertOriginal in A-minor') 문자열 안에서 찾는다.
+        if field and _PD_LOOSE_RE.search(field):
             return True
     blob = ' '.join(x for x in (composer, artist) if x)
     return bool(_TRAD_RE.search(blob))
