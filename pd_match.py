@@ -111,6 +111,53 @@ PD_COMPOSERS = [
     'Liapounow',   # Lyapunov 독일식 표기 †1924
     'Drouët',      # Louis Drouet — 악센트 표기
     'Neander',     # Joachim Neander †1680 — 찬송가
+    # ── 합창 정전 보강 (CPDL 주력 — 전원 1955년 이전 사망 확인) ──
+    # 르네상스 다성음악
+    'Lasso',       # Orlando di Lasso †1594 (Lassus 표기와 별개)
+    'Marenzio',    # Luca Marenzio †1599
+    'Gesualdo',    # Carlo Gesualdo †1613
+    'Gabrieli',    # Andrea †1585 · Giovanni †1612
+    'Willaert',    # Adrian Willaert †1562
+    'Gombert',     # Nicolas Gombert †1560
+    'Clemens',     # Clemens non Papa †1555
+    'Crecquillon',  # Thomas Crecquillon †1557
+    'Obrecht',     # Jacob Obrecht †1505
+    'Senfl',       # Ludwig Senfl †1543
+    'Isaac',       # Heinrich Isaac †1517
+    'Dufay',       # Guillaume Du Fay †1474
+    'Binchois',    # Gilles Binchois †1460
+    'Busnois',     # Antoine Busnois †1492
+    'Mouton',      # Jean Mouton †1522
+    'Certon',      # Pierre Certon †1572
+    'Janequin',    # Clément Janequin †1558
+    'Sermisy',     # Claudin de Sermisy †1562
+    'Costeley',    # Guillaume Costeley †1606
+    # 영국 튜더·자코비안
+    'Morley',      # Thomas Morley †1602
+    'Weelkes',     # Thomas Weelkes †1623
+    'Wilbye',      # John Wilbye †1638
+    'Tomkins',     # Thomas Tomkins †1656
+    'Sheppard',    # John Sheppard †1558
+    'Taverner',    # John Taverner †1545
+    'Mundy',       # William Mundy †1591
+    'Parsons',     # Robert Parsons †1572
+    # 이베리아
+    'Guerrero',    # Francisco Guerrero †1599
+    'Morales',     # Cristóbal de Morales †1553
+    'Cardoso',     # Manuel Cardoso †1650
+    # 독일 바로크·루터파
+    'Schütz', 'Schutz',   # Heinrich Schütz †1672
+    'Schein',      # Johann Hermann Schein †1630
+    'Scheidt',     # Samuel Scheidt †1654
+    'Hassler',     # Hans Leo Hassler †1612
+    'Eccard',      # Johannes Eccard †1611
+    'Vulpius',     # Melchior Vulpius †1615
+    'Crüger', 'Cruger',   # Johann Crüger †1662
+    'Hammerschmidt',      # Andreas Hammerschmidt †1675
+    # 19세기 합창·교회
+    'Reger',       # Max Reger †1916
+    'Cornelius',   # Peter Cornelius †1874
+    'Cherubini',   # Luigi Cherubini †1842
 ]
 # 다른 뜻으로도 쓰이는 성 — 흔한 영어 낱말이거나(Field, Dont, Rose)
 # 현대 음악가의 '이름' 자리에 오는 것들(Lalo Schifrin, Ernst Toch).
@@ -123,6 +170,9 @@ AMBIGUOUS = {
     'hastings', 'heller', 'hymn', 'klengel', 'kummer', 'lalo', 'marcello',
     'milan', 'monti', 'parry', 'ponce', 'rode', 'rose', 'ries', 'seitz',
     'sitt', 'stainer', 'turk', 'victoria', 'vincent', 'wesley',
+    # 합창 보강분 중 흔한 낱말·이름과 겹치는 것
+    'clemens', 'isaac', 'lasso', 'morales', 'morley', 'mundy',
+    'parsons', 'cornelius', 'gabrieli',
 }
 _PD_RE = re.compile(
     '|'.join(re.escape(n) for n in PD_COMPOSERS), re.I)
@@ -162,8 +212,13 @@ def surname_of(field):
         toks = [t for t in part.split() if t]
         while len(toks) > 1 and _TAIL.match(toks[-1]):
             toks.pop()                        # "Strauss Jr." → Strauss
-        if toks:
-            yield toks[-1]
+        if not toks:
+            continue
+        yield toks[-1]
+        # 귀족·소유 전치사가 성에 붙어 굳은 이름 — 출처마다 띄어쓰기가
+        # 달라 두 꼴을 다 본다 ("Guillaume Du Fay" ↔ "Dufay").
+        if len(toks) > 1 and _TAIL.match(toks[-2]):
+            yield toks[-2] + toks[-1]
 
 
 def is_pd_composer(composer, artist):

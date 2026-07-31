@@ -1,0 +1,59 @@
+name: CPDL 합창곡 수집
+
+# CPDL은 곡마다 문서에 재배포 조건이 명시돼 있다(CPDL 라이선스 / CC /
+# 퍼블릭 도메인). 그중 작곡가가 PD 명단에 있는 곡만 받는다.
+#
+# discover=1 로 먼저 돌려 API 응답과 위키텍스트 구조를 확인한 뒤
+# 본 수집을 실행한다 — 파서가 실제 문서와 어긋나면 조용히 0곡이 된다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: '1이면 내려받지 않고 API·문서 구조 표본만 출력'
+        default: '0'
+      new_add:
+        description: '이번 런 신규 추가 상한'
+        default: '4500'
+      max_minutes:
+        description: '최대 실행 시간(분)'
+        default: '300'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cpdl
+  cancel-in-progress: false
+
+jobs:
+  cpdl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      DISCOVER: ${{ inputs.discover }}
+      NEW_ADD: ${{ inputs.new_add }}
+      MAX_MINUTES: ${{ inputs.max_minutes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 도구 설치 (poppler·webp)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils webp
+
+      - name: 수집 실행
+        run: python3 collect_cpdl.py
+
+      - name: 결과 커밋
+        if: inputs.discover != '1'
+        run: |
+          git config user.name sheet-collector-bot
+          git config user.email actions@github.com
+          git add catalog2.json
+          [ -d raw ] && git add raw
+          [ -d thumbs ] && git add thumbs
+          if git diff --cached --quiet; then echo '변경 없음'; exit 0; fi
+          git commit -m 'CPDL 합창곡 자동 수집 결과 [skip ci]'
+          for i in 1 2 3 4; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep $((i * 2))
+          done
