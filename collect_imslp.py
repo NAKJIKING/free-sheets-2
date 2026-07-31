@@ -26,10 +26,20 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(ROOT, '_imslp_out')  # 릴리스 자산 업로드용 (깃 미포함)
+# 릴리스 하나에 자산 1,000개 상한이 있다. 교본 수집 때 이 상한에
+# 걸려 3천여 곡 중 1,000개만 올라갔고, 앱에서 대부분 미리보기·
+# 다운로드가 안 돼 수리에만 하루가 걸렸다. 같은 실수를 반복하지
+# 않도록 곡을 450개씩(자산 900개) 릴리스에 나눠 담는다.
+SHARD = 450
 CATALOG = os.path.join(ROOT, 'catalog2.json')
-TAG = os.environ.get('IMSLP_TAG', 'imslp-1')
-BASE_URL = ('https://github.com/NAKJIKING/free-sheets-2/'
-            f'releases/download/{TAG}')
+TAG_PREFIX = os.environ.get('IMSLP_TAG', 'imslp')
+REL = 'https://github.com/NAKJIKING/free-sheets-2/releases/download'
+
+
+def shard_of(n):
+    """n번째 곡이 갈 (릴리스 태그, 자산 디렉터리)."""
+    tag = f'{TAG_PREFIX}-{1 + n // SHARD}'
+    return tag, os.path.join(OUT, tag)
 VOL1 = ('https://raw.githubusercontent.com/NAKJIKING/'
         'free-sheets/main/catalog.json')
 API = 'https://imslp.org/api.php'
@@ -238,6 +248,8 @@ def main():
 
     debug = bool(os.environ.get('IMSLP_DEBUG'))
     cats = CATEGORIES[:2] if debug else CATEGORIES  # 디버그는 2개만
+    # 이미 담긴 imslp 곡 수 — 샤드 번호를 여기서 이어 붙인다.
+    imslp_before = sum(1 for e in catalog if e.get('source') == 'imslp')
     added = 0
     per_composer = {}
     for cat, inst, cap in cats:
@@ -295,14 +307,18 @@ def main():
             if not data or not data.startswith(b'%PDF'):
                 continue
             asset = re.sub(r'[^A-Za-z0-9._-]', '_', name)[:100]
-            with open(os.path.join(OUT, asset), 'wb') as f:
+            # 이미 담긴 imslp 곡 수를 이어받아 샤드를 매긴다 —
+            # 재실행해도 앞 릴리스를 다시 채우지 않는다.
+            tag, shard_dir = shard_of(imslp_before + added)
+            os.makedirs(shard_dir, exist_ok=True)
+            with open(os.path.join(shard_dir, asset), 'wb') as f:
                 f.write(data)
             thumb_asset = 'T_' + os.path.splitext(asset)[0] + '.webp'
-            has_thumb = make_thumb(os.path.join(OUT, asset),
-                                   os.path.join(OUT, thumb_asset))
+            has_thumb = make_thumb(os.path.join(shard_dir, asset),
+                                   os.path.join(shard_dir, thumb_asset))
             entry = {
                 'source': 'imslp',
-                'base': BASE_URL,
+                'base': f'{REL}/{tag}',
                 'source_url': src,
                 'file': asset,
                 'title': work,
@@ -329,8 +345,10 @@ def main():
     json.dump(catalog, open(CATALOG, 'w', encoding='utf-8'),
               ensure_ascii=False, indent=1)
     n = sum(1 for e in catalog if e.get('source') == 'imslp')
+    shards = sorted(os.listdir(OUT)) if os.path.isdir(OUT) else []
+    files = sum(len(os.listdir(os.path.join(OUT, d))) for d in shards)
     print(f'IMSLP 신규 {added}곡 (2권 내 imslp 총 {n}곡), '
-          f'자산 파일 {len(os.listdir(OUT))}개', flush=True)
+          f'자산 {files}개 · 릴리스 {len(shards)}개 {shards}', flush=True)
 
 
 if __name__ == '__main__':

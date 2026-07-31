@@ -2,6 +2,10 @@ name: IMSLP 선별 수확
 
 on:
   workflow_dispatch:
+    inputs:
+      limit:
+        description: '이번 런 신규 수집 상한(곡)'
+        default: '5000'
 
 permissions:
   contents: write
@@ -15,7 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
-      IMSLP_TAG: imslp-1
+      # 태그 접두사 — 수집기가 450곡마다 imslp-1, imslp-2 … 로 나눈다
+      IMSLP_TAG: imslp
+      IMSLP_LIMIT: ${{ inputs.limit }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -26,26 +32,44 @@ jobs:
       - name: 수집 실행
         run: python3 collect_imslp.py
 
-      - name: 릴리스 자산 업로드
+      - name: 릴리스 자산 업로드 (샤드별)
         run: |
-          if [ ! -d _imslp_out ] || [ -z "$(ls -A _imslp_out)" ]; then
+          # 릴리스 하나에 자산 1,000개 상한이 있다. 수집기가 곡을
+          # 450개씩 _imslp_out/<태그>/ 로 나눠 담으므로 디렉터리마다
+          # 자기 릴리스에 올린다. 상한에 걸려 조용히 잘리면 앱에서
+          # 미리보기·다운로드가 안 된다(교본에서 겪은 실패).
+          shopt -s nullglob
+          dirs=(_imslp_out/*/)
+          if [ ${#dirs[@]} -eq 0 ]; then
             echo '업로드할 자산 없음'
             exit 0
           fi
-          gh release view "$IMSLP_TAG" >/dev/null 2>&1 || \
-            gh release create "$IMSLP_TAG" -t "IMSLP scores ($IMSLP_TAG)" \
-              -n "Public domain scanned scores mirrored from IMSLP."
-          # 수백 개 자산 — 50개씩 나눠 업로드 (인자 길이·재시도 관리)
-          ls _imslp_out | sort > _assets.txt
-          split -l 50 _assets.txt _chunk_
-          for c in _chunk_*; do
-            files=$(sed 's|^|_imslp_out/|' "$c" | tr '\n' ' ')
-            for i in 1 2 3; do
-              gh release upload "$IMSLP_TAG" $files --clobber && break
-              sleep $((i * 5))
+          fail=0
+          for d in "${dirs[@]}"; do
+            tag=$(basename "$d")
+            n=$(ls "$d" | wc -l)
+            echo "== $tag : 자산 $n개"
+            gh release view "$tag" >/dev/null 2>&1 || \
+              gh release create "$tag" -t "IMSLP scores ($tag)" \
+                -n "Public domain scanned scores mirrored from IMSLP."
+            ls "$d" | sort > _assets.txt
+            split -l 50 _assets.txt _chunk_
+            for c in _chunk_*; do
+              files=$(sed "s|^|$d|" "$c" | tr '\n' ' ')
+              ok=0
+              for i in 1 2 3; do
+                if timeout 900 gh release upload "$tag" $files --clobber; then
+                  ok=1; break
+                fi
+                sleep $((i * 5))
+              done
+              [ $ok -eq 1 ] || { echo "  ! $tag 업로드 실패"; fail=1; }
             done
+            rm -f _assets.txt _chunk_*
           done
-          rm -f _assets.txt _chunk_*
+          # 자산이 안 올라갔는데 카탈로그만 커밋하면 앱에서 깨진 곡이
+          # 생긴다 — 실패하면 여기서 멈춘다.
+          [ $fail -eq 0 ] || exit 1
 
       - name: 카탈로그 커밋
         run: |
