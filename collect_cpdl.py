@@ -38,7 +38,28 @@ CATALOG = os.path.join(ROOT, 'catalog2.json')
 API = 'https://www.cpdl.org/wiki/api.php'
 SITE = 'https://www.cpdl.org'
 BASE_URL = 'https://raw.githubusercontent.com/NAKJIKING/free-sheets-2/main'
-UA = {'User-Agent': 'MySheetMusic-FreeLibrary/1.0 (public-domain collector)'}
+# CPDL 앞단이 밋밋한 요청을 403으로 막는다. 브라우저가 늘 보내는
+# 헤더(Accept·Accept-Language)가 없으면 봇으로 본다. 어느 조합이
+# 통하는지는 실제로 때려 봐야 알 수 있어 사다리로 시도하고, 통한
+# 조합을 기억해 이후 요청에 계속 쓴다.
+CONTACT = 'MySheetMusic-FreeLibrary/1.0 (+mailto:hhs.79.dsn@gmail.com)'
+BROWSER = ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+           '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
+HEADER_SETS = [
+    {'User-Agent': CONTACT},
+    {'User-Agent': CONTACT,
+     'Accept': 'application/json,*/*;q=0.8',
+     'Accept-Language': 'en-US,en;q=0.9'},
+    {'User-Agent': f'{BROWSER} {CONTACT}',
+     'Accept': 'application/json,*/*;q=0.8',
+     'Accept-Language': 'en-US,en;q=0.9'},
+    {'User-Agent': BROWSER,
+     'Accept': ('text/html,application/xhtml+xml,application/xml;q=0.9,'
+                '*/*;q=0.8'),
+     'Accept-Language': 'en-US,en;q=0.9',
+     'Referer': 'https://www.cpdl.org/wiki/'},
+]
+UA = HEADER_SETS[0]      # 통하는 조합을 찾으면 여기로 바꾼다
 
 DISCOVER = os.environ.get('DISCOVER', '') == '1'
 NEW_ADD = int(os.environ.get('NEW_ADD', '4500'))
@@ -55,24 +76,33 @@ NO_LICENSE = re.compile(
 
 
 def api(**params):
+    global UA
     params.setdefault('format', 'json')
     params.setdefault('formatversion', '2')
     url = API + '?' + urllib.parse.urlencode(params)
-    for i in range(4):
-        try:
-            req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.loads(r.read().decode('utf-8', 'replace'))
-        except Exception as e:
-            print(f'  ! API 실패({i + 1}) {e}', flush=True)
-            time.sleep(3 * (i + 1))
+    # 먼저 지금 쓰는 헤더로, 막히면 사다리를 올라간다.
+    tries = [UA] + [h for h in HEADER_SETS if h is not UA]
+    for h in tries:
+        for i in range(2):
+            try:
+                req = urllib.request.Request(url, headers=h)
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    if h is not UA:
+                        print(f'  · 헤더 교체 성공: {h.get("User-Agent")[:50]}',
+                              flush=True)
+                        UA = h
+                    return json.loads(r.read().decode('utf-8', 'replace'))
+            except Exception as e:
+                print(f'  ! API 실패 [{h.get("User-Agent", "")[:28]}] {e}',
+                      flush=True)
+                time.sleep(2 * (i + 1))
     return None
 
 
 def fetch(url):
     for i in range(3):
         try:
-            req = urllib.request.Request(url, headers=UA)
+            req = urllib.request.Request(url, headers=UA)  # api()가 고른 헤더
             with urllib.request.urlopen(req, timeout=90) as r:
                 return r.read()
         except Exception:

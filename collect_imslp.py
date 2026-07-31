@@ -36,53 +36,37 @@ API = 'https://imslp.org/api.php'
 UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector; '
                     'contact hhs.79.dsn@gmail.com)'}
 
-TOTAL_LIMIT = int(os.environ.get('IMSLP_LIMIT', '600'))
-PER_COMPOSER = 25
+TOTAL_LIMIT = int(os.environ.get('IMSLP_LIMIT', '5000'))
+PER_COMPOSER = int(os.environ.get('IMSLP_PER_COMPOSER', '60'))
 MAX_FILE = 8 * 1024 * 1024
 
 # (카테고리, 악기 분류, 카테고리별 상한)
 CATEGORIES = [
-    ('For piano', 'Piano', 160),
-    ('For guitar', 'Guitar', 80),
-    ('For violin, piano', 'Violin', 80),
-    ('For violin', 'Violin', 40),
-    ('For flute, piano', 'Flute', 60),
-    ('For flute', 'Flute', 30),
-    ('For cello, piano', 'Cello', 60),
-    ('For clarinet, piano', 'Clarinet', 50),
-    ('For trumpet, piano', 'Trumpet', 40),
+    ('For piano', 'Piano', 1200),
+    ('For piano 4 hands', 'Piano', 200),
+    ('For guitar', 'Guitar', 400),
+    ('For violin, piano', 'Violin', 400),
+    ('For violin', 'Violin', 200),
+    ('For flute, piano', 'Flute', 300),
+    ('For flute', 'Flute', 150),
+    ('For cello, piano', 'Cello', 300),
+    ('For clarinet, piano', 'Clarinet', 200),
+    ('For trumpet, piano', 'Trumpet', 150),
+    ('For organ', 'Organ', 300),
+    ('For harpsichord', 'Harpsichord', 150),
+    ('For viola, piano', 'Viola', 120),
+    ('For oboe, piano', 'Oboe', 100),
+    ('For bassoon, piano', 'Bassoon', 80),
+    ('For horn, piano', 'Horn', 80),
+    ('For saxophone, piano', 'Saxophone', 80),
+    ('For harp', 'Harp', 120),
+    ('For voice, piano', 'Voice', 400),
+    ('For 2 violins, viola, cello', 'String quartet', 200),
 ]
 
-# 화이트리스트 — collect_pdmx2.py와 같은 기준(사후 70년+ 확실).
-# IMSLP 제목의 괄호 안 작곡가 표기("Chopin, Frédéric")에 대조한다.
-PD_COMPOSERS = [
-    'Bach', 'Handel', 'Vivaldi', 'Telemann', 'Purcell', 'Scarlatti',
-    'Corelli', 'Albinoni', 'Pachelbel', 'Rameau', 'Couperin', 'Buxtehude',
-    'Haydn', 'Mozart', 'Beethoven', 'Clementi', 'Czerny', 'Diabelli',
-    'Hummel', 'Kuhlau', 'Schubert', 'Schumann', 'Chopin', 'Liszt',
-    'Mendelssohn', 'Brahms', 'Tchaikovsky', 'Rimsky-Korsakov',
-    'Mussorgsky', 'Borodin', 'Glinka', 'Rachmaninoff', 'Scriabin',
-    'Grieg', 'Dvořák', 'Dvorak', 'Smetana', 'Debussy', 'Ravel',
-    'Fauré', 'Faure', 'Saint-Saëns', 'Saint-Saens', 'Franck', 'Bizet',
-    'Gounod', 'Massenet', 'Satie', 'Elgar', 'Albéniz', 'Albeniz',
-    'Granados', 'Paganini', 'Sarasate', 'Wieniawski', 'Weber',
-    'Burgmüller', 'Moszkowski', 'Chaminade', 'Field', 'Heller',
-    'Gurlitt', 'Streabbog', 'Lemoine', 'Duvernoy', 'Bertini', 'Hanon',
-    'Cramer', 'Dussek', 'Alkan', 'Gottschalk', 'Nazareth', 'Joplin',
-    'Sousa', 'Foster', 'Tárrega', 'Tarrega', 'Sor', 'Giuliani',
-    'Carcassi', 'Carulli', 'Aguado', 'Mertz', 'Vieuxtemps', 'Ysaÿe',
-    'Beriot', 'Bériot', 'Rode', 'Kreutzer', 'Viotti', 'Dancla',
-    'Kayser', 'Mazas', 'Accolay', 'Seitz', 'Rieding', 'Monti',
-    'Popper', 'Goltermann', 'Dotzauer', 'Duport', 'Tulou', 'Gariboldi',
-    'Taffanel', 'Doppler', 'Briccialdi', 'Demersseman', 'Köhler',
-    'Kohler', 'Andersen', 'Drouet', 'Quantz', 'Stamitz', 'Danzi',
-    'Boccherini', 'Arban', 'Clarke', 'Klosé', 'Klose', 'Baermann',
-    'Crusell', 'Rossini', 'Verdi', 'Puccini', 'Offenbach', 'Delibes',
-    'Boismortier', 'Leclair', 'Loeillet', 'Marcello', 'Galuppi',
-    'Tartini', 'Geminiani', 'Locatelli', 'Pleyel', 'Reicha', 'Ries',
-]
-_PD_RE = re.compile(
-    r'\b(' + '|'.join(re.escape(n) for n in PD_COMPOSERS) + r')\b')
+# PD 판정은 pd_match.py 로 통일한다 — 수집기마다 명단이 따로
+# 놀면 한쪽만 고쳤을 때 조용히 어긋난다.
+from pd_match import is_pd_composer  # noqa: E402
 
 
 def api_get(params, retries=3):
@@ -276,7 +260,8 @@ def main():
                 continue
             stats['paren'] += 1
             composer = m.group(1).strip()  # 'Chopin, Frédéric'
-            if not _PD_RE.search(composer):
+            # 'Chopin, Frédéric' 은 쉼표 앞이 성 — surname_of 가 그렇게 읽는다
+            if not is_pd_composer(composer, ''):
                 continue
             stats['wl'] += 1
             surname = composer.split(',')[0].strip()
