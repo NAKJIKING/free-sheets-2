@@ -45,6 +45,13 @@ VOL1 = ('https://raw.githubusercontent.com/NAKJIKING/'
 API = 'https://imslp.org/api.php'
 UA = {'User-Agent': 'MySheetMusic-FreeLibrary/2.0 (public-domain collector; '
                     'contact hhs.79.dsn@gmail.com)'}
+# IMSLP은 파일을 주기 전에 면책 동의 페이지를 한 번 거치게 한다.
+# 동의 쿠키가 없으면 PDF 대신 그 HTML이 온다 — 후보를 995곡 찾고도
+# 한 곡도 못 받은 원인이 이것으로 짐작된다.
+DL_HEADERS = {**UA,
+              'Accept-Encoding': 'identity',
+              'Referer': 'https://imslp.org/',
+              'Cookie': 'imslpdisclaimeraccepted=yes; imslp_wikiLanguageSelectorLanguage=en'}
 
 TOTAL_LIMIT = int(os.environ.get('IMSLP_LIMIT', '5000'))
 PER_COMPOSER = int(os.environ.get('IMSLP_PER_COMPOSER', '60'))
@@ -95,8 +102,7 @@ def api_get(params, retries=3):
 def fetch_bytes(url, retries=2):
     # IMSLP는 Accept-Encoding 없이도 gzip으로 응답한다 — 평문을 요청하되
     # 그래도 gzip 매직이 오면 직접 푼다 (action=raw가 이 경우였다).
-    req = urllib.request.Request(
-        url, headers={**UA, 'Accept-Encoding': 'identity'})
+    req = urllib.request.Request(url, headers=DL_HEADERS)
     for i in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=180) as r:
@@ -305,6 +311,13 @@ def main():
                       f'크기 {len(data) if data else 0} 머리 {head!r}',
                       flush=True)
             if not data or not data.startswith(b'%PDF'):
+                # 조용히 넘기면 '후보 995곡, 수집 0곡'의 이유를 못 본다.
+                stats['nopdf'] = stats.get('nopdf', 0) + 1
+                if stats['nopdf'] <= 3:
+                    head = (data[:120] if data else b'(None)')
+                    print(f'  ! PDF 아님: {name!r}\n    url={url}\n'
+                          f'    크기 {len(data) if data else 0} 머리 {head!r}',
+                          flush=True)
                 continue
             asset = re.sub(r'[^A-Za-z0-9._-]', '_', name)[:100]
             # 이미 담긴 imslp 곡 수를 이어받아 샤드를 매긴다 —
